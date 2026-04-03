@@ -1,4 +1,4 @@
-# app.py
+# app.py — MorphGen
 
 import torch
 import numpy as np
@@ -16,7 +16,7 @@ from data.dataset import denormalize
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="FaceGen — Conditional GAN",
+    page_title="MorphGen — Conditional Face Generation",
     page_icon="",
     layout="wide"
 )
@@ -148,7 +148,7 @@ def generate_image(G, attr_vector, seed=None):
 # UI
 # ---------------------------------------------------------------------------
 
-st.title("FaceGen")
+st.title("MorphGen")
 st.markdown("**Conditional GAN trained on CelebA** — select attributes to control face generation.")
 st.markdown("---")
 
@@ -220,7 +220,7 @@ with col_output:
 st.markdown("---")
 st.markdown(
     "<p style='font-family: Space Mono, monospace; font-size: 0.75rem; color: #555;'>"
-    "Conditional DCGAN · WGAN-GP · CelebA · PyTorch"
+    "MorphGen · Conditional DCGAN · WGAN-GP · CelebA · PyTorch"
     "</p>",
     unsafe_allow_html=True
 )
