@@ -59,8 +59,7 @@ class Discriminator(nn.Module):
 
         fd = FEATURES_D  # 64
 
-        # Project attribute vector → [batch, NUM_ATTRIBUTES, 64, 64]
-        # so it can be concatenated channel-wise with the image
+        # Project attribute vector → spatial map matching input image size
         self.attr_embed = nn.Sequential(
             nn.Linear(NUM_ATTRIBUTES, IMAGE_SIZE * IMAGE_SIZE),
             nn.LeakyReLU(0.2, inplace=True)
@@ -69,7 +68,7 @@ class Discriminator(nn.Module):
         # Input channels = image channels + 1 (projected attribute map)
         in_channels = CHANNELS + 1
 
-        # 64x64 → 32x32  (no norm on first layer — standard practice)
+        # 64x64 → 32x32  (no norm on first layer)
         self.block1 = DiscriminatorBlock(in_channels, fd,      normalize=False)
         # 32x32 → 16x16
         self.block2 = DiscriminatorBlock(fd,          fd * 2)
@@ -93,13 +92,14 @@ class Discriminator(nn.Module):
             score : [batch, 1]
         """
         batch = image.size(0)
+        h, w  = image.shape[2], image.shape[3]  # use actual spatial dims
 
-        # Project attributes → [batch, 1, 64, 64]
-        attr_map = self.attr_embed(attrs.float())                        # [batch, 64*64]
-        attr_map = attr_map.view(batch, 1, IMAGE_SIZE, IMAGE_SIZE)       # [batch, 1, 64, 64]
+        # Project attributes → [batch, 1, h, w]
+        attr_map = self.attr_embed(attrs.float())        # [batch, h*w]
+        attr_map = attr_map.view(batch, 1, h, w)         # [batch, 1, h, w]
 
         # Concatenate along channel dimension
-        x = torch.cat([image, attr_map], dim=1)                         # [batch, 4, 64, 64]
+        x = torch.cat([image, attr_map], dim=1)          # [batch, 4, h, w]
 
         x = self.block1(x)   # [batch, fd,    32, 32]
         x = self.block2(x)   # [batch, fd*2,  16, 16]
@@ -107,7 +107,7 @@ class Discriminator(nn.Module):
         x = self.block4(x)   # [batch, fd*8,  4,  4]
         x = self.output(x)   # [batch, 1,     1,  1]
 
-        return x.view(batch, 1)   # [batch, 1]
+        return x.view(batch, 1)
 
     def _initialize_weights(self):
         for m in self.modules():
@@ -134,5 +134,5 @@ if __name__ == "__main__":
 
     print(f"\nInput  image  : {images.shape}")
     print(f"Input  attrs  : {attrs.shape}")
-    print(f"Output scores : {scores.shape}")    # expect [4, 1]
-    print(f"Score range   : [{scores.min():.2f}, {scores.max():.2f}]")  # unbounded — no sigmoid
+    print(f"Output scores : {scores.shape}")
+    print(f"Score range   : [{scores.min():.2f}, {scores.max():.2f}]")
