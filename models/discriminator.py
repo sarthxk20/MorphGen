@@ -9,16 +9,6 @@ from config import NUM_ATTRIBUTES, CHANNELS, FEATURES_D, IMAGE_SIZE
 
 
 class DiscriminatorBlock(nn.Module):
-    """
-    A single downsampling block used repeatedly in the Discriminator.
-    Each block halves the spatial resolution of the feature map.
-
-    Conv2d → InstanceNorm → LeakyReLU
-
-    Note: We use InstanceNorm instead of BatchNorm here.
-    WGAN-GP's gradient penalty requires per-sample gradients,
-    which BatchNorm breaks by coupling samples in a batch together.
-    """
     def __init__(self, in_channels, out_channels, kernel_size=4, stride=2, padding=1, normalize=True):
         super().__init__()
         layers = [
@@ -37,16 +27,6 @@ class Discriminator(nn.Module):
     """
     Conditional DCGAN Discriminator (Critic in WGAN terminology).
 
-    Takes an image and an attribute vector, and outputs a scalar score.
-    Higher score = more likely to be real.
-    No sigmoid — WGAN-GP uses raw scores (Wasserstein distance estimate).
-
-    Conditioning: the attribute vector is projected to a spatial map
-    and concatenated channel-wise with the input image.
-
-    Architecture:
-        64x64 → 32x32 → 16x16 → 8x8 → 4x4 → scalar
-
     Input:
         image : [batch, 3, 64, 64]
         attrs : [batch, NUM_ATTRIBUTES]
@@ -59,53 +39,36 @@ class Discriminator(nn.Module):
 
         fd = FEATURES_D  # 64
 
-        # Project attribute vector → spatial map matching input image size
+        # Project attribute vector → [batch, 64*64]
         self.attr_embed = nn.Sequential(
-            nn.Linear(NUM_ATTRIBUTES, IMAGE_SIZE * IMAGE_SIZE),
+            nn.Linear(NUM_ATTRIBUTES, 64 * 64),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
-        # Input channels = image channels + 1 (projected attribute map)
         in_channels = CHANNELS + 1
 
-        # 64x64 → 32x32  (no norm on first layer)
         self.block1 = DiscriminatorBlock(in_channels, fd,      normalize=False)
-        # 32x32 → 16x16
         self.block2 = DiscriminatorBlock(fd,          fd * 2)
-        # 16x16 → 8x8
         self.block3 = DiscriminatorBlock(fd * 2,      fd * 4)
-        # 8x8 → 4x4
         self.block4 = DiscriminatorBlock(fd * 4,      fd * 8)
 
-        # 4x4 → scalar score
         self.output = nn.Conv2d(fd * 8, 1, kernel_size=4, stride=1, padding=0, bias=False)
 
         self._initialize_weights()
 
     def forward(self, image, attrs):
-        """
-        Args:
-            image : [batch, 3, 64, 64]
-            attrs : [batch, NUM_ATTRIBUTES]
-
-        Returns:
-            score : [batch, 1]
-        """
         batch = image.size(0)
-        h, w  = image.shape[2], image.shape[3]  # use actual spatial dims
 
-        # Project attributes → [batch, 1, h, w]
-        attr_map = self.attr_embed(attrs.float())        # [batch, h*w]
-        attr_map = attr_map.view(batch, 1, h, w)         # [batch, 1, h, w]
+        attr_map = self.attr_embed(attrs.float())        # [batch, 4096]
+        attr_map = attr_map.view(batch, 1, 64, 64)       # [batch, 1, 64, 64]
 
-        # Concatenate along channel dimension
-        x = torch.cat([image, attr_map], dim=1)          # [batch, 4, h, w]
+        x = torch.cat([image, attr_map], dim=1)          # [batch, 4, 64, 64]
 
-        x = self.block1(x)   # [batch, fd,    32, 32]
-        x = self.block2(x)   # [batch, fd*2,  16, 16]
-        x = self.block3(x)   # [batch, fd*4,  8,  8]
-        x = self.block4(x)   # [batch, fd*8,  4,  4]
-        x = self.output(x)   # [batch, 1,     1,  1]
+        x = self.block1(x)
+        x = self.block2(x)
+        x = self.block3(x)
+        x = self.block4(x)
+        x = self.output(x)
 
         return x.view(batch, 1)
 
@@ -122,17 +85,15 @@ class Discriminator(nn.Module):
 # Sanity check
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    from config import DEVICE, LATENT_DIM
+    from config import DEVICE
 
     D = Discriminator().to(DEVICE)
-    print(D)
-    print(f"\nTotal parameters: {sum(p.numel() for p in D.parameters()):,}")
+    print(f"Total parameters: {sum(p.numel() for p in D.parameters()):,}")
 
-    images = torch.randn(4, CHANNELS, IMAGE_SIZE, IMAGE_SIZE).to(DEVICE)
+    images = torch.randn(4, CHANNELS, 64, 64).to(DEVICE)
     attrs  = torch.randint(0, 2, (4, NUM_ATTRIBUTES)).float().to(DEVICE)
     scores = D(images, attrs)
 
-    print(f"\nInput  image  : {images.shape}")
+    print(f"Input  image  : {images.shape}")
     print(f"Input  attrs  : {attrs.shape}")
     print(f"Output scores : {scores.shape}")
-    print(f"Score range   : [{scores.min():.2f}, {scores.max():.2f}]")
