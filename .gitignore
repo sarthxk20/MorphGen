@@ -1,7 +1,7 @@
-# Dataset (200GB+, never commit this)
+# Dataset 
 data/celeba/
 
-# Model checkpoints (can be large)
+# Model checkpoints 
 outputs/checkpoints/
 
 # Python cache
