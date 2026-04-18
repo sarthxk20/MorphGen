@@ -13,8 +13,6 @@ from data.dataset import denormalize
 # ---------------------------------------------------------------------------
 # Fixed noise and attributes — used throughout training for consistent grids
 # ---------------------------------------------------------------------------
-# We generate these once and reuse them every SAMPLE_INTERVAL steps.
-# This lets you visually track how the same latent codes improve over time.
 
 FIXED_Z = torch.randn(64, LATENT_DIM, device=DEVICE)
 
