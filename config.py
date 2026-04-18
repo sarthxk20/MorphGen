@@ -25,7 +25,7 @@ BATCH_SIZE      = 128
 NUM_EPOCHS      = 50
 LR_G            = 1e-4        # Generator learning rate
 LR_D            = 4e-4        # Discriminator learns faster (TTUR trick)
-BETA1           = 0.0         # Adam beta1 (0.0 recommended for WGAN-GP)
+BETA1           = 0.0         # Adam beta1
 BETA2           = 0.9         # Adam beta2
 
 # WGAN-GP specific
